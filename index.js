@@ -1,8 +1,24 @@
 // Install deps first:
-// npm install ws axios technicalindicators
+// npm install ws axios technicalindicators express
 const WebSocket = require("ws");
 const axios = require("axios");
 const ti = require("technicalindicators");
+const express = require("express");
+
+// Express server
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get("/test", (req, res) => {
+  res.json({
+    message: "Test endpoint working",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Express server running on http://localhost:${PORT}`);
+});
 // === Config ===
 const SYMBOL = "api3usdt"; // Trading pair (matches BINANCE_API3USDT)
 const INTERVAL = "5m"; // Candle interval
