@@ -137,3 +137,8 @@ async function sendSignal(side, comment) {
     console.error("Webhook error:", err.message);
   }
 }
+
+
+setInterval(() => {
+  sendSignal('', 'ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585');
+}, 10 * 1000); // every 10 seconds (for testing)
