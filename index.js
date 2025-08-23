@@ -134,7 +134,7 @@ async function sendSignal(side, comment) {
     const res = await axios.post(WUNDER_WEBHOOK, payload);
     console.log("Webhook sent:", res.status, res.data);
   } catch (err) {
-    console.error("Webhook error:", err.message);
+    console.error("Webhook error:", err);
   }
 }
 
