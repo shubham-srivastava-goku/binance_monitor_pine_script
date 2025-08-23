@@ -125,10 +125,10 @@ async function handleMessage(msg) {
 async function sendSignal(side, comment) {
   try {
     const payload = {
-      symbol: "API3USDT",
-      side: side, // "buy" or "sell"
-      type: "market",
-      amount: 10, // <-- adjust position size
+      // symbol: "API3USDT",
+      // side: side, // "buy" or "sell"
+      // type: "market",
+      // amount: 10, // <-- adjust position size
       comment: comment, // Matches TradingView comments
     };
     const res = await axios.post(WUNDER_WEBHOOK, payload);
@@ -139,6 +139,6 @@ async function sendSignal(side, comment) {
 }
 
 
-setInterval(() => {
+setTimeout(() => {
   sendSignal('', 'ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585');
-}, 10 * 1000); // every 10 seconds (for testing)
+}, 30 * 1000); // every 10 seconds (for testing)
