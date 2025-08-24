@@ -3,7 +3,7 @@
 const express = require("express");
 const axios = require("axios");
 const WebSocket = require("ws");
-const { RSI } = require("technicalindicators");
+const { RSI, getRSI } = require("technicalindicators");
 
 const app = express();
 app.use(express.json());
@@ -25,30 +25,49 @@ class SymbolBot {
     this.entryMessage = entryMessage;
     this.exitMessage = exitMessage;
     this.closes = [];
+    this.rsi = null; // Store the RSI instance
     this.prevRsi = null;
     this.inLong = false;
     this.ws = null;
   }
 
   async seedHistoricalCloses() {
-    const limit = RSI_PERIOD + 1;
-    const url =
-      `https://api.binance.com/api/v3/klines` +
-      `?symbol=${this.symbol.toUpperCase()}` +
-      `&interval=${this.interval}` +
-      `&limit=${limit}`;
-    const resp = await axios.get(url);
-    resp.data.forEach((k) => this.closes.push(parseFloat(k[4])));
-    const initialRsi = RSI.calculate({
-      values: this.closes,
-      period: RSI_PERIOD,
-    });
-    this.prevRsi = initialRsi[initialRsi.length - 1];
-    console.log(
-      `[${this.symbol}] Seeded closes=${
-        this.closes.length
-      }, initial RSI=${this.prevRsi.toFixed(2)}`
-    );
+    try {
+      const limit = RSI_PERIOD + 10; // Get more data than the minimum to be safe
+      const url =
+        `https://api.binance.com/api/v3/klines` +
+        `?symbol=${this.symbol.toUpperCase()}` +
+        `&interval=${this.interval}` +
+        `&limit=${limit}`;
+      const resp = await axios.get(url);
+      const historicalCloses = resp.data.map((k) => parseFloat(k[4]));
+
+      // Use RSI.calculate on the full history to get all historical RSI values
+      const rsiArray = RSI.calculate({
+        values: historicalCloses,
+        period: RSI_PERIOD,
+      });
+
+      // Initialize the streaming RSI with an empty array
+      this.rsi = new RSI({ period: RSI_PERIOD, values: [] });
+
+      // Seed the streaming RSI instance with the data
+      historicalCloses.forEach((close) => this.rsi.nextValue(close));
+
+      this.prevRsi = rsiArray[rsiArray.length - 1];
+
+      console.log(
+        `[${this.symbol}] Seeded closes=${
+          historicalCloses.length
+        }, initial RSI=${this.prevRsi.toFixed(2)}`
+      );
+    } catch (err) {
+      console.error(
+        `[${this.symbol}] Error seeding historical closes:`,
+        err.message
+      );
+      throw err;
+    }
   }
 
   async sendWebhook(payload) {
@@ -78,25 +97,27 @@ class SymbolBot {
     this.ws.on("message", (data) => {
       const msg = JSON.parse(data);
       if (msg.e !== "kline" || !msg.k.x) return;
-
       const time = msg.k.t;
       const close = parseFloat(msg.k.c);
 
-      // 1) maintain only RSI_PERIOD+1 closes
-      this.closes.push(close);
-      if (this.closes.length > RSI_PERIOD + 1) this.closes.shift();
+      const currRsi = this.rsi.nextValue(close);
 
-      // 2) need at least RSI_PERIOD+1 to compute two RSI points
-      if (this.closes.length < RSI_PERIOD + 1) return;
+      // We need at least two RSI values to check for a crossover
+      if (this.prevRsi === null || currRsi === undefined) {
+        if (currRsi !== undefined) {
+          this.prevRsi = currRsi;
+        }
+        return;
+      }
 
-      // 3) calc last two RSI values
-      const slice = this.closes.slice(-(RSI_PERIOD + 1));
-      const rsiArray = RSI.calculate({ values: slice, period: RSI_PERIOD });
-      const currRsi = rsiArray[rsiArray.length - 1];
-      const prevRsi = rsiArray[rsiArray.length - 2];
+      console.log(
+        `[${this.symbol}] close=${close} prevRsi=${this.prevRsi.toFixed(
+          2
+        )} currRsi=${currRsi.toFixed(2)} inLong=${this.inLong}`
+      );
 
       // 4) entry crossover
-      if (!this.inLong && prevRsi <= RSI_ENTRY && currRsi > RSI_ENTRY) {
+      if (!this.inLong && this.prevRsi <= RSI_ENTRY && currRsi > RSI_ENTRY) {
         const payload = {
           symbol: this.symbol.toUpperCase(),
           type: "ENTER-LONG",
@@ -109,7 +130,7 @@ class SymbolBot {
       }
 
       // 5) exit crossunder
-      if (this.inLong && prevRsi >= RSI_EXIT && currRsi < RSI_EXIT) {
+      if (this.inLong && this.prevRsi >= RSI_EXIT && currRsi < RSI_EXIT) {
         const payload = {
           symbol: this.symbol.toUpperCase(),
           type: "EXIT-LONG",
