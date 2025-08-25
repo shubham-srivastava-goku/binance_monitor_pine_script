@@ -4,6 +4,7 @@ const express = require("express");
 const axios = require("axios");
 const WebSocket = require("ws");
 const { RSI, getRSI } = require("technicalindicators");
+const { fork } = require("child_process");
 
 const app = express();
 app.use(express.json());
@@ -243,4 +244,6 @@ app.get("/symbols", (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`API server listening on port ${PORT}`);
+  // Start worker on server start
+  fork("./symbolsWorker.js");
 });
