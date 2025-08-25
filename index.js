@@ -243,6 +243,7 @@ app.get("/symbols", (req, res) => {
       interval: bot.interval,
       entryMessage: bot.entryMessage,
       exitMessage: bot.exitMessage,
+      inLong: bot.inLong,
     });
   }
   res.json(list);
