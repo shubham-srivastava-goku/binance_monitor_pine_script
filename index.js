@@ -164,7 +164,7 @@ class SymbolBot {
 }
 const createNewSymbolBot = async (
   res,
-  { symbol: key, interval, entryMessage, exitMessage }
+  { symbol: key, interval, entryMessage, exitMessage, inLong }
 ) => {
   const bot = new SymbolBot({
     symbol: key,
@@ -172,10 +172,16 @@ const createNewSymbolBot = async (
     entryMessage,
     exitMessage,
   });
+  if (typeof inLong === "boolean") {
+    bot.inLong = inLong;
+  }
   bots.set(key, bot);
   try {
     await bot.start();
-    res && res.status(201).json({ message: "Symbol added", symbol: key });
+    res &&
+      res
+        .status(201)
+        .json({ message: "Symbol added", symbol: key, inLong: bot.inLong });
   } catch (e) {
     bots.delete(key);
     res && res.status(500).json({ error: e.message });
@@ -183,7 +189,7 @@ const createNewSymbolBot = async (
 };
 // POST /symbols – add & start a bot
 app.post("/symbols", async (req, res) => {
-  const { symbol, interval, entryMessage, exitMessage } = req.body;
+  const { symbol, interval, entryMessage, exitMessage, inLong } = req.body;
   if (!symbol || !interval || !entryMessage || !exitMessage) {
     return res.status(400).json({ error: "Missing required fields" });
   }
@@ -196,6 +202,7 @@ app.post("/symbols", async (req, res) => {
     interval,
     entryMessage,
     exitMessage,
+    inLong, // pass through, may be undefined
   });
 });
 
@@ -239,6 +246,20 @@ app.get("/symbols", (req, res) => {
     });
   }
   res.json(list);
+});
+
+// PATCH /symbols/:symbol/status – update inLong status
+app.patch("/symbols/:symbol/status", (req, res) => {
+  const key = req.params.symbol.toLowerCase();
+  const bot = bots.get(key);
+  if (!bot) return res.status(404).json({ error: "Symbol not found" });
+
+  const { inLong } = req.body;
+  if (typeof inLong !== "boolean")
+    return res.status(400).json({ error: "inLong must be boolean" });
+
+  bot.inLong = inLong;
+  res.json({ message: "Status updated", symbol: key, inLong: bot.inLong });
 });
 
 // Start server

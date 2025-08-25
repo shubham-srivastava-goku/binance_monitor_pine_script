@@ -7,7 +7,7 @@ const API_URL = `${
 async function pollSymbols() {
   try {
     const res = await axios.get(API_URL);
-    console.log("[Worker] Active symbols:", res.data);
+    console.log("[Worker] Active symbols:", res.status);
   } catch (err) {
     console.error("[Worker] Error fetching symbols:", err.message);
   }
@@ -17,4 +17,4 @@ async function pollSymbols() {
 setInterval(pollSymbols, 60 * 1000);
 
 // Initial call
-pollSymbols();
+// pollSymbols();
