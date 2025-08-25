@@ -3,7 +3,7 @@
 const express = require("express");
 const axios = require("axios");
 const WebSocket = require("ws");
-const { RSI, getRSI } = require("technicalindicators");
+const { RSI } = require("technicalindicators");
 const { fork } = require("child_process");
 
 const app = express();
@@ -13,11 +13,17 @@ const PORT = process.env.PORT || 3000;
 const WEBHOOK_URL = "https://wtalerts.com/bot/custom";
 
 const RSI_PERIOD = 7;
-const RSI_ENTRY = 65;
-const RSI_EXIT = 20;
+const RSI_ENTRY = 85;
+const RSI_EXIT = 25;
 
 // In‐memory registry of active symbol bots
 const bots = new Map();
+
+let rsiConfig = {
+  period: RSI_PERIOD,
+  entry: RSI_ENTRY,
+  exit: RSI_EXIT,
+};
 
 class SymbolBot {
   constructor({ symbol, interval, entryMessage, exitMessage }) {
@@ -34,7 +40,7 @@ class SymbolBot {
 
   async seedHistoricalCloses() {
     try {
-      const limit = RSI_PERIOD + 10; // Get more data than the minimum to be safe
+      const limit = rsiConfig.period + 10; // Get more data than the minimum to be safe
       const url =
         `https://api.binance.com/api/v3/klines` +
         `?symbol=${this.symbol.toUpperCase()}` +
@@ -46,11 +52,11 @@ class SymbolBot {
       // Use RSI.calculate on the full history to get all historical RSI values
       const rsiArray = RSI.calculate({
         values: historicalCloses,
-        period: RSI_PERIOD,
+        period: rsiConfig.period,
       });
 
       // Initialize the streaming RSI with an empty array
-      this.rsi = new RSI({ period: RSI_PERIOD, values: [] });
+      this.rsi = new RSI({ period: rsiConfig.period, values: [] });
 
       // Seed the streaming RSI instance with the data
       historicalCloses.forEach((close) => this.rsi.nextValue(close));
@@ -118,7 +124,11 @@ class SymbolBot {
       );
 
       // 4) entry crossover
-      if (!this.inLong && this.prevRsi <= RSI_ENTRY && currRsi > RSI_ENTRY) {
+      if (
+        !this.inLong &&
+        this.prevRsi <= rsiConfig.entry &&
+        currRsi > rsiConfig.entry
+      ) {
         const payload = {
           symbol: this.symbol.toUpperCase(),
           type: "ENTER-LONG",
@@ -131,7 +141,11 @@ class SymbolBot {
       }
 
       // 5) exit crossunder
-      if (this.inLong && this.prevRsi >= RSI_EXIT && currRsi < RSI_EXIT) {
+      if (
+        this.inLong &&
+        this.prevRsi >= rsiConfig.exit &&
+        currRsi < rsiConfig.exit
+      ) {
         const payload = {
           symbol: this.symbol.toUpperCase(),
           type: "EXIT-LONG",
@@ -213,6 +227,7 @@ createNewSymbolBot(undefined, {
     "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
   exitMessage:
     "EXIT-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+  inLong: false,
 });
 
 createNewSymbolBot(undefined, {
@@ -222,6 +237,7 @@ createNewSymbolBot(undefined, {
     "ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
   exitMessage:
     "EXIT-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
+  inLong: true,
 });
 
 // DELETE /symbols/:symbol – stop & remove a bot
@@ -261,6 +277,34 @@ app.patch("/symbols/:symbol/status", (req, res) => {
 
   bot.inLong = inLong;
   res.json({ message: "Status updated", symbol: key, inLong: bot.inLong });
+});
+
+// PATCH /rsi-config – update RSI parameters
+app.patch("/rsi-config", (req, res) => {
+  const { period, entry, exit } = req.body;
+  if (period !== undefined) {
+    if (typeof period !== "number" || period < 1)
+      return res
+        .status(400)
+        .json({ error: "period must be a positive number" });
+    rsiConfig.period = period;
+  }
+  if (entry !== undefined) {
+    if (typeof entry !== "number" || entry < 0 || entry > 100)
+      return res.status(400).json({ error: "entry must be between 0 and 100" });
+    rsiConfig.entry = entry;
+  }
+  if (exit !== undefined) {
+    if (typeof exit !== "number" || exit < 0 || exit > 100)
+      return res.status(400).json({ error: "exit must be between 0 and 100" });
+    rsiConfig.exit = exit;
+  }
+  res.json({ message: "RSI config updated", rsiConfig });
+});
+
+// GET /rsi-config – get current RSI parameters
+app.get("/rsi-config", (req, res) => {
+  res.json(rsiConfig);
 });
 
 // Start server
