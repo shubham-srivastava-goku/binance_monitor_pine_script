@@ -121,7 +121,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot) => {
 
       const params = req.body;
 
-      const { quantity, price } = params;
+      const { quantity, price, symbol } = params;
       if (!quantity || !price) {
         return res.status(400).json({ error: "Missing quantity or price" });
       }
@@ -131,7 +131,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot) => {
         APISECRET: apiSecret,
       });
 
-      const response = await binance.buy("BNBETH", quantity, price, {
+      const response = await binance.buy(symbol, quantity, price, {
         type: "LIMIT",
       });
       console.info("Limit Buy response", response);
