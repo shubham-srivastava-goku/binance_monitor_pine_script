@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const crypto = require("crypto");
+const Binance = require("node-binance-api");
 
 module.exports = (bots, rsiConfig, createNewSymbolBot) => {
   // POST /symbols – add & start a bot
@@ -114,53 +115,79 @@ module.exports = (bots, rsiConfig, createNewSymbolBot) => {
 
   // POST /api/v3/order – create a new Binance order
   router.post("/order", async (req, res) => {
-    const apiKey = process.env.BINANCE_API_KEY;
-    const apiSecret = process.env.BINANCE_API_SECRET;
-    if (!apiKey || !apiSecret) {
-      return res.status(500).json({ error: "Binance API credentials not set" });
-    }
-
-    const baseUrl = "https://api.binance.com";
-    const endpoint = "/api/v3/order";
-    const params = req.body;
-
-    // Add timestamp if not present
-    params.timestamp = params.timestamp || Date.now();
-
-    // Create query string
-    const query = Object.entries(params)
-      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-      .join("&");
-
-    // Sign the query string
-    const signature = crypto
-      .createHmac("sha256", apiSecret)
-      .update(query)
-      .digest("hex");
-
-    // Final query string with signature
-    const finalQuery = `${query}&signature=${signature}`;
-    console.log("Final Query:", finalQuery);
-    console.log("Request Body:", params);
-
     try {
-      const response = await axios.post(
-        `${baseUrl}${endpoint}?${finalQuery}`,
-        {},
-        {
-          headers: {
-            "X-MBX-APIKEY": apiKey,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      res.json(response.data);
+      const apiKey = process.env.BINANCE_API_KEY;
+      const apiSecret = process.env.BINANCE_API_SECRET;
+
+      const params = req.body;
+
+      const { quantity, price } = params;
+      if (!quantity || !price) {
+        return res.status(400).json({ error: "Missing quantity or price" });
+      }
+
+      const binance = new Binance({
+        APIKEY: apiKey,
+        APISECRET: apiSecret,
+      });
+
+      const response = await binance.buy("BNBETH", quantity, price, {
+        type: "LIMIT",
+      });
+      console.info("Limit Buy response", response);
+      console.info("order id: " + response.orderId);
+
+      res.json(response);
     } catch (err) {
-      console.error("Order Error:", err.response?.data || err.message);
-      res
-        .status(err.response?.status || 500)
-        .json({ error: err.response?.data || err.message });
+      console.error("Order Error:", err.body || err.message);
+      res.status(err.status || 500).json({ error: err.body || err.message });
     }
+
+    // if (!apiKey || !apiSecret) {
+    //   return res.status(500).json({ error: "Binance API credentials not set" });
+    // }
+
+    // const baseUrl = "https://api.binance.com";
+    // const endpoint = "/api/v3/order";
+    // const params = req.body;
+
+    // // Add timestamp if not present
+    // params.timestamp = params.timestamp || Date.now();
+
+    // // Create query string
+    // const query = Object.entries(params)
+    //   .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    //   .join("&");
+
+    // // Sign the query string
+    // const signature = crypto
+    //   .createHmac("sha256", apiSecret)
+    //   .update(query)
+    //   .digest("hex");
+
+    // // Final query string with signature
+    // const finalQuery = `${query}&signature=${signature}`;
+    // console.log("Final Query:", finalQuery);
+    // console.log("Request Body:", params);
+
+    // try {
+    //   const response = await axios.post(
+    //     `${baseUrl}${endpoint}?${finalQuery}`,
+    //     {},
+    //     {
+    //       headers: {
+    //         "X-MBX-APIKEY": apiKey,
+    //         "Content-Type": "application/json",
+    //       },
+    //     }
+    //   );
+    //   res.json(response.data);
+    // } catch (err) {
+    //   console.error("Order Error:", err.response?.data || err.message);
+    //   res
+    //     .status(err.response?.status || 500)
+    //     .json({ error: err.response?.data || err.message });
+    // }
   });
 
   return router;
