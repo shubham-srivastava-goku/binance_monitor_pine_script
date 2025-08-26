@@ -91,15 +91,30 @@ async function runExampleTriggers() {
   await triggerDeleteSymbol("api3usdt");
 }
 
+async function triggerWebhook(symbol, payload) {
+  try {
+    const url = `${BASE_URL}/webhook/${symbol.toLowerCase()}`;
+    const response = await axios.post(url, { payload });
+    console.log("Update Symbol Status Response:", response.data);
+    return res.data;
+  } catch (err) {
+    console.error(
+      "Update Symbol Status Error:",
+      err.response?.data || err.message
+    );
+  }
+}
+
 // Uncomment to run examples directly
 // runExampleTriggers();
 
 // triggerUpdateSymbolStatus("api3usdt", true);
-triggerListSymbols();
+// triggerListSymbols();
 
 module.exports = {
   triggerAddSymbol,
   triggerDeleteSymbol,
   triggerListSymbols,
   triggerUpdateSymbolStatus,
+  triggerWebhook,
 };

@@ -307,6 +307,24 @@ app.get("/rsi-config", (req, res) => {
   res.json(rsiConfig);
 });
 
+// POST /webhook/:symbol – trigger sendWebhook for a bot
+app.post("/webhook/:symbol", async (req, res) => {
+  const key = req.params.symbol.toLowerCase();
+  const bot = bots.get(key);
+  if (!bot) return res.status(404).json({ error: "Symbol not found" });
+
+  const { payload } = req.body;
+  if (!payload || typeof payload !== "object")
+    return res.status(400).json({ error: "Missing or invalid payload" });
+
+  try {
+    await bot.sendWebhook(payload);
+    res.json({ message: "Webhook triggered", symbol: key, payload });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`API server listening on port ${PORT}`);
