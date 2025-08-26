@@ -32,10 +32,13 @@ let rsiConfig = {
   exit: RSI_EXIT,
 };
 
-const getAvailavleBalance = async () => {
+let availableBalance = {};
+
+const getAvailableBalance = async () => {
   try {
     const balance = await binance.balance();
     console.log("Available balance:", balance);
+    availableBalance = { ...balance };
     return balance;
   } catch (err) {
     console.error("Error fetching balance:", err.message);
@@ -53,6 +56,10 @@ class SymbolBot {
     this.prevRsi = null;
     this.inLong = false;
     this.ws = null;
+    this.symbolQuntity =
+      availableBalance[symbol.replace("usdt", "").toUpperCase()]?.available ||
+      0;
+    this.usdtQuantity = availableBalance["USDT"]?.available || 0;
   }
 
   async seedHistoricalCloses() {
@@ -110,6 +117,108 @@ class SymbolBot {
     }
   }
 
+  async sendBuyOrder(price) {
+    try {
+      console.log(
+        `[${this.symbol}] Preparing to buy. USDT balance: ${this.usdtQuantity}, price: ${price}`
+      );
+
+      // Get latest balances before calculation
+      await getAvailableBalance();
+      const usdtBalance = availableBalance["USDT"]?.available || 0;
+      console.log(`[${this.symbol}] Fresh USDT balance: ${usdtBalance}`);
+
+      // Get exchange info for stepSize
+      const info = await binance.exchangeInfo();
+      const symbolInfo = info.symbols.find(
+        (s) => s.symbol === this.symbol.toUpperCase()
+      );
+      const stepSize = parseFloat(
+        symbolInfo.filters.find((f) => f.filterType === "LOT_SIZE").stepSize
+      );
+      console.log(`[${this.symbol}] Step size for quantity: ${stepSize}`);
+
+      let quantity = usdtBalance / price;
+      quantity = Math.floor(quantity / stepSize) * stepSize;
+      quantity = quantity.toFixed(8);
+
+      console.log(
+        `[${this.symbol}] Calculated buy quantity (rounded): ${quantity}`
+      );
+
+      const order = await binance.buy(this.symbol, quantity, price, {
+        type: "LIMIT",
+      });
+      console.log(`[${this.symbol}] Buy order placed:`, order);
+
+      // Update balances after buy
+      await getAvailableBalance();
+      this.symbolQuntity =
+        availableBalance[this.symbol.replace("usdt", "").toUpperCase()]
+          ?.available || 0;
+      this.usdtQuantity = availableBalance["USDT"]?.available || 0;
+      console.log(
+        `[${this.symbol}] Updated balances after buy. Symbol quantity: ${this.symbolQuntity}, USDT quantity: ${this.usdtQuantity}`
+      );
+    } catch (err) {
+      console.error(
+        `[${this.symbol}] Buy order error:`,
+        err.body || err.message
+      );
+    }
+  }
+
+  async sendSellOrder(price) {
+    try {
+      // Get latest balances before calculation
+      await getAvailableBalance();
+      const assetBalance =
+        availableBalance[this.symbol.replace("usdt", "").toUpperCase()]
+          ?.available || 0;
+      console.log(
+        `[${this.symbol}] Preparing to sell. Symbol quantity: ${assetBalance}, price: ${price}`
+      );
+
+      // Get exchange info for stepSize
+      const info = await binance.exchangeInfo();
+      const symbolInfo = info.symbols.find(
+        (s) => s.symbol === this.symbol.toUpperCase()
+      );
+      const stepSize = parseFloat(
+        symbolInfo.filters.find((f) => f.filterType === "LOT_SIZE").stepSize
+      );
+      console.log(`[${this.symbol}] Step size for quantity: ${stepSize}`);
+
+      let quantity = assetBalance;
+      quantity = Math.floor(quantity / stepSize) * stepSize;
+      quantity = quantity.toFixed(8);
+
+      console.log(
+        `[${this.symbol}] Calculated sell quantity (rounded): ${quantity}`
+      );
+
+      const order = await binance.sell(this.symbol, quantity, price, {
+        type: "LIMIT",
+      });
+      console.log(`[${this.symbol}] Sell order placed:`, order);
+
+      // Update balances after sell
+      await getAvailableBalance();
+      this.symbolQuntity =
+        availableBalance[this.symbol.replace("usdt", "").toUpperCase()]
+          ?.available || 0;
+      this.usdtQuantity = availableBalance["USDT"]?.available || 0;
+      console.log(
+        `[${this.symbol}] Updated balances after sell. Symbol quantity: ${this.symbolQuntity}, USDT quantity: ${this.usdtQuantity}`
+      );
+    } catch (err) {
+      console.error(
+        `[${this.symbol}] Sell order error:`,
+        err.body || err.message
+      );
+    }
+  }
+
   startStream() {
     const streamUrl = `wss://stream.binance.com:9443/ws/${this.symbol}@kline_${this.interval}`;
     this.ws = new WebSocket(streamUrl);
@@ -140,20 +249,25 @@ class SymbolBot {
         )} currRsi=${currRsi.toFixed(2)} inLong=${this.inLong}`
       );
 
+      if (this.symbol === "ethusdt") {
+        this.sendBuyOrder(4000);
+      }
+
       // 4) entry crossover
       if (
         !this.inLong &&
         this.prevRsi <= rsiConfig.entry &&
         currRsi > rsiConfig.entry
       ) {
-        const payload = {
-          symbol: this.symbol.toUpperCase(),
-          type: "ENTER-LONG",
-          price: close,
-          time,
-          comment: this.entryMessage,
-        };
-        this.sendWebhook(payload);
+        // const payload = {
+        //   symbol: this.symbol.toUpperCase(),
+        //   type: "ENTER-LONG",
+        //   price: close,
+        //   time,
+        //   comment: this.entryMessage,
+        // };
+        this.sendBuyOrder(close);
+        // this.sendWebhook(payload);
         this.inLong = true;
       }
 
@@ -170,7 +284,8 @@ class SymbolBot {
           time,
           comment: this.exitMessage,
         };
-        this.sendWebhook(payload);
+        // this.sendWebhook(payload);
+        this.sendBuyOrder(price);
         this.inLong = false;
       }
 
@@ -231,7 +346,7 @@ app.use("/", routes);
 // Start server
 app.listen(PORT, async () => {
   console.log(`API server listening on port ${PORT}`);
-  await getAvailavleBalance();
+  await getAvailableBalance();
 
   createNewSymbolBot(undefined, {
     symbol: "ethusdt",
