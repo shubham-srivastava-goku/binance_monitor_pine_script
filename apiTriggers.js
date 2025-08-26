@@ -126,9 +126,11 @@ const orderParamsExample = {
   symbol: "ETHUSDT",
   side: "BUY",
   type: "LIMIT",
-  quantity: 6,
-  price: "4000.00",
-  timeInForce: "GTC",
+  // quantity: 6,
+  // price: "4000.00",
+  // timeInForce: "GTC",
+  // icebergQty: "3.0",
+  // recvWindow: 5000,
 };
 
 triggerOrder(orderParamsExample);

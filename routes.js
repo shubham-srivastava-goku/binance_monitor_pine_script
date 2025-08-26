@@ -142,10 +142,11 @@ module.exports = (bots, rsiConfig, createNewSymbolBot) => {
     const finalQuery = `${query}&signature=${signature}`;
     console.log("Final Query:", finalQuery);
     console.log("Request Body:", params);
+
     try {
       const response = await axios.post(
         `${baseUrl}${endpoint}?${finalQuery}`,
-        {},
+        null,
         {
           headers: {
             "X-MBX-APIKEY": apiKey,
@@ -153,6 +154,21 @@ module.exports = (bots, rsiConfig, createNewSymbolBot) => {
           },
         }
       );
+      console.log("Order Response:", response.data);
+      //   res.json(response.data);
+    } catch (err) {
+      console.error("Order Error:", err.response?.data || err.message);
+      //   res
+      //     .status(err.response?.status || 500)
+      //     .json({ error: err.response?.data || err.message });
+    }
+    try {
+      const response = await axios.post(`${baseUrl}${endpoint}`, finalQuery, {
+        headers: {
+          "X-MBX-APIKEY": apiKey,
+          "Content-Type": "application/json",
+        },
+      });
       res.json(response.data);
     } catch (err) {
       res
