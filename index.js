@@ -146,9 +146,14 @@ class SymbolBot {
         `[${this.symbol}] Calculated buy quantity (rounded): ${quantity}`
       );
 
-      const order = await binance.buy(this.symbol, quantity, price, {
-        type: "LIMIT",
-      });
+      const order = await binance.buy(
+        this.symbol.toUpperCase(),
+        quantity,
+        price,
+        {
+          type: "LIMIT",
+        }
+      );
       console.log(`[${this.symbol}] Buy order placed:`, order);
 
       // Update balances after buy
