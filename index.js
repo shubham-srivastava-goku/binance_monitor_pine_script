@@ -37,7 +37,6 @@ let availableBalance = {};
 const getAvailableBalance = async () => {
   try {
     const balance = await binance.balance();
-    console.log("Available balance:", balance);
     availableBalance = { ...balance };
     return balance;
   } catch (err) {
@@ -202,9 +201,14 @@ class SymbolBot {
         `[${this.symbol}] Calculated sell quantity (rounded): ${quantity}`
       );
 
-      const order = await binance.sell(this.symbol, quantity, price, {
-        type: "LIMIT",
-      });
+      const order = await binance.sell(
+        this.symbol.toUpperCase(),
+        quantity,
+        price,
+        {
+          type: "LIMIT",
+        }
+      );
       console.log(`[${this.symbol}] Sell order placed:`, order);
 
       // Update balances after sell
@@ -253,10 +257,6 @@ class SymbolBot {
           2
         )} currRsi=${currRsi.toFixed(2)} inLong=${this.inLong}`
       );
-
-      if (this.symbol === "ethusdt") {
-        this.sendBuyOrder(4000);
-      }
 
       // 4) entry crossover
       if (
@@ -363,15 +363,15 @@ app.listen(PORT, async () => {
     inLong: false,
   });
 
-  createNewSymbolBot(undefined, {
-    symbol: "api3usdt",
-    interval: "5m",
-    entryMessage:
-      "ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
-    exitMessage:
-      "EXIT-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
-    inLong: true,
-  });
+  // createNewSymbolBot(undefined, {
+  //   symbol: "api3usdt",
+  //   interval: "5m",
+  //   entryMessage:
+  //     "ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
+  //   exitMessage:
+  //     "EXIT-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
+  //   inLong: true,
+  // });
 
   // Start worker on server start
   fork("./symbolsWorker.js");
