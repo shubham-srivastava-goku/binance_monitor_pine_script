@@ -201,24 +201,10 @@ const createNewSymbolBot = async (
     res && res.status(500).json({ error: e.message });
   }
 };
-// POST /symbols – add & start a bot
-app.post("/symbols", async (req, res) => {
-  const { symbol, interval, entryMessage, exitMessage, inLong } = req.body;
-  if (!symbol || !interval || !entryMessage || !exitMessage) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-  const key = symbol.toLowerCase();
-  if (bots.has(key)) {
-    return res.status(409).json({ error: "Symbol already exists" });
-  }
-  await createNewSymbolBot(res, {
-    symbol: key,
-    interval,
-    entryMessage,
-    exitMessage,
-    inLong, // pass through, may be undefined
-  });
-});
+
+// Move route logic to routes.js
+const routes = require("./routes")(bots, rsiConfig, createNewSymbolBot);
+app.use("/", routes);
 
 createNewSymbolBot(undefined, {
   symbol: "ethusdt",
@@ -238,91 +224,6 @@ createNewSymbolBot(undefined, {
   exitMessage:
     "EXIT-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
   inLong: true,
-});
-
-// DELETE /symbols/:symbol – stop & remove a bot
-app.delete("/symbols/:symbol", (req, res) => {
-  const key = req.params.symbol.toLowerCase();
-  const bot = bots.get(key);
-  if (!bot) return res.status(404).json({ error: "Symbol not found" });
-  bot.stop();
-  bots.delete(key);
-  res.json({ message: "Symbol removed", symbol: key });
-});
-
-// GET /symbols – list active bots
-app.get("/symbols", (req, res) => {
-  const list = [];
-  for (const [key, bot] of bots.entries()) {
-    list.push({
-      symbol: key,
-      interval: bot.interval,
-      entryMessage: bot.entryMessage,
-      exitMessage: bot.exitMessage,
-      inLong: bot.inLong,
-    });
-  }
-  res.json(list);
-});
-
-// PATCH /symbols/:symbol/status – update inLong status
-app.patch("/symbols/:symbol/status", (req, res) => {
-  const key = req.params.symbol.toLowerCase();
-  const bot = bots.get(key);
-  if (!bot) return res.status(404).json({ error: "Symbol not found" });
-
-  const { inLong } = req.body;
-  if (typeof inLong !== "boolean")
-    return res.status(400).json({ error: "inLong must be boolean" });
-
-  bot.inLong = inLong;
-  res.json({ message: "Status updated", symbol: key, inLong: bot.inLong });
-});
-
-// PATCH /rsi-config – update RSI parameters
-app.patch("/rsi-config", (req, res) => {
-  const { period, entry, exit } = req.body;
-  if (period !== undefined) {
-    if (typeof period !== "number" || period < 1)
-      return res
-        .status(400)
-        .json({ error: "period must be a positive number" });
-    rsiConfig.period = period;
-  }
-  if (entry !== undefined) {
-    if (typeof entry !== "number" || entry < 0 || entry > 100)
-      return res.status(400).json({ error: "entry must be between 0 and 100" });
-    rsiConfig.entry = entry;
-  }
-  if (exit !== undefined) {
-    if (typeof exit !== "number" || exit < 0 || exit > 100)
-      return res.status(400).json({ error: "exit must be between 0 and 100" });
-    rsiConfig.exit = exit;
-  }
-  res.json({ message: "RSI config updated", rsiConfig });
-});
-
-// GET /rsi-config – get current RSI parameters
-app.get("/rsi-config", (req, res) => {
-  res.json(rsiConfig);
-});
-
-// POST /webhook/:symbol – trigger sendWebhook for a bot
-app.post("/webhook/:symbol", async (req, res) => {
-  const key = req.params.symbol.toLowerCase();
-  const bot = bots.get(key);
-  if (!bot) return res.status(404).json({ error: "Symbol not found" });
-
-  const { payload } = req.body;
-  if (!payload || typeof payload !== "object")
-    return res.status(400).json({ error: "Missing or invalid payload" });
-
-  try {
-    await bot.sendWebhook(payload);
-    res.json({ message: "Webhook triggered", symbol: key, payload });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // Start server

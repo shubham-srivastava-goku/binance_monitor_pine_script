@@ -96,7 +96,7 @@ async function triggerWebhook(symbol, payload) {
     const url = `${BASE_URL}/webhook/${symbol.toLowerCase()}`;
     const response = await axios.post(url, { payload });
     console.log("Update Symbol Status Response:", response.data);
-    return res.data;
+    return response.data;
   } catch (err) {
     console.error(
       "Update Symbol Status Error:",
@@ -105,11 +105,44 @@ async function triggerWebhook(symbol, payload) {
   }
 }
 
+/**
+ * Triggers the /order API on the local backend.
+ * @param {Object} orderParams - The order parameters for Binance.
+ * @returns {Promise<Object>} - The response from the backend.
+ */
+async function triggerOrder(orderParams) {
+  try {
+    const response = await axios.post(`${BASE_URL}/order`, orderParams, {
+      headers: { "Content-Type": "application/json" },
+    });
+    console.log("Order Response:", response.data);
+    return response.data;
+  } catch (err) {
+    console.error("Order Error:", err.response?.data || err.message);
+  }
+}
+
+const orderParamsExample = {
+  symbol: "ETHUSDT",
+  side: "BUY",
+  type: "LIMIT",
+  quantity: 6,
+  price: "4000.00",
+  timeInForce: "GTC",
+};
+
+triggerOrder(orderParamsExample);
+
 // Uncomment to run examples directly
 // runExampleTriggers();
 
 // triggerUpdateSymbolStatus("api3usdt", true);
 // triggerListSymbols();
+
+// triggerWebhook("ethusdt", {
+//   comment:
+//     "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+// });
 
 module.exports = {
   triggerAddSymbol,
@@ -117,4 +150,5 @@ module.exports = {
   triggerListSymbols,
   triggerUpdateSymbolStatus,
   triggerWebhook,
+  triggerOrder,
 };
