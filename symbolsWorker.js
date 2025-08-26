@@ -15,6 +15,3 @@ async function pollSymbols() {
 
 // Poll every 1 minute
 setInterval(pollSymbols, 60 * 1000);
-
-// Initial call
-// pollSymbols();

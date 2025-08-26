@@ -5,12 +5,15 @@ const axios = require("axios");
 const WebSocket = require("ws");
 const { RSI } = require("technicalindicators");
 const { fork } = require("child_process");
+const Binance = require("node-binance-api");
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const WEBHOOK_URL = "https://wtalerts.com/bot/custom";
+const apiKey = process.env.BINANCE_API_KEY;
+const apiSecret = process.env.BINANCE_API_SECRET;
 
 const RSI_PERIOD = 7;
 const RSI_ENTRY = 85;
@@ -18,11 +21,25 @@ const RSI_EXIT = 25;
 
 // In‐memory registry of active symbol bots
 const bots = new Map();
+const binance = new Binance({
+  APIKEY: apiKey,
+  APISECRET: apiSecret,
+});
 
 let rsiConfig = {
   period: RSI_PERIOD,
   entry: RSI_ENTRY,
   exit: RSI_EXIT,
+};
+
+const getAvailavleBalance = async () => {
+  try {
+    const balance = await binance.balance();
+    console.log("Available balance:", balance);
+    return balance;
+  } catch (err) {
+    console.error("Error fetching balance:", err.message);
+  }
 };
 
 class SymbolBot {
@@ -203,32 +220,39 @@ const createNewSymbolBot = async (
 };
 
 // Move route logic to routes.js
-const routes = require("./routes")(bots, rsiConfig, createNewSymbolBot);
+const routes = require("./routes")(
+  bots,
+  rsiConfig,
+  createNewSymbolBot,
+  binance
+);
 app.use("/", routes);
 
-createNewSymbolBot(undefined, {
-  symbol: "ethusdt",
-  interval: "5m",
-  entryMessage:
-    "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
-  exitMessage:
-    "EXIT-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
-  inLong: false,
-});
-
-createNewSymbolBot(undefined, {
-  symbol: "api3usdt",
-  interval: "5m",
-  entryMessage:
-    "ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
-  exitMessage:
-    "EXIT-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
-  inLong: true,
-});
-
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`API server listening on port ${PORT}`);
+  await getAvailavleBalance();
+
+  createNewSymbolBot(undefined, {
+    symbol: "ethusdt",
+    interval: "5m",
+    entryMessage:
+      "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+    exitMessage:
+      "EXIT-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+    inLong: false,
+  });
+
+  createNewSymbolBot(undefined, {
+    symbol: "api3usdt",
+    interval: "5m",
+    entryMessage:
+      "ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
+    exitMessage:
+      "EXIT-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
+    inLong: true,
+  });
+
   // Start worker on server start
   fork("./symbolsWorker.js");
 });

@@ -1,10 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const axios = require("axios");
-const crypto = require("crypto");
-const Binance = require("node-binance-api");
 
-module.exports = (bots, rsiConfig, createNewSymbolBot) => {
+module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
   // POST /symbols – add & start a bot
   router.post("/symbols", async (req, res) => {
     const { symbol, interval, entryMessage, exitMessage, inLong } = req.body;
@@ -116,9 +113,6 @@ module.exports = (bots, rsiConfig, createNewSymbolBot) => {
   // POST /api/v3/order – create a new Binance order
   router.post("/order", async (req, res) => {
     try {
-      const apiKey = process.env.BINANCE_API_KEY;
-      const apiSecret = process.env.BINANCE_API_SECRET;
-
       const params = req.body;
 
       const { quantity, price, symbol } = params;

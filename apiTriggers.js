@@ -124,11 +124,11 @@ async function triggerOrder(orderParams) {
 
 const orderParamsExample = {
   symbol: "ETHUSDT",
-  side: "BUY",
-  type: "LIMIT",
-  quantity: 6,
+  // side: "BUY",
+  // type: "LIMIT",
+  quantity: "0.0024",
   price: "4000.00",
-  timeInForce: "GTC",
+  // timeInForce: "GTC",
   // icebergQty: "3.0",
   // recvWindow: 5000,
 };
