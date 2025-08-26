@@ -140,7 +140,8 @@ module.exports = (bots, rsiConfig, createNewSymbolBot) => {
 
     // Final query string with signature
     const finalQuery = `${query}&signature=${signature}`;
-
+    console.log("Final Query:", finalQuery);
+    console.log("Request Body:", params);
     try {
       const response = await axios.post(
         `${baseUrl}${endpoint}?${finalQuery}`,
