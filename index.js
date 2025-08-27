@@ -351,28 +351,38 @@ app.use("/", routes);
 // Start server
 app.listen(PORT, async () => {
   console.log(`API server listening on port ${PORT}`);
-  await getAvailableBalance();
+  try {
+    fork("./symbolsWorker.js");
+    await getAvailableBalance();
 
-  createNewSymbolBot(undefined, {
-    symbol: "ethusdt",
-    interval: "5m",
-    entryMessage:
-      "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
-    exitMessage:
-      "EXIT-LONG_BINANCE_MULTIPLE-PAIRS_ETHUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
-    inLong: false,
-  });
+    // Create bots for all assets except USDT with available balance > 0
+    for (const asset in availableBalance) {
+      if (asset === "USDT") continue;
+      const balance = parseFloat(availableBalance[asset]?.available || "0");
+      if (balance > 0) {
+        console.log(
+          `Creating bot for ${asset} with available balance: ${balance}`
+        );
+        const symbol = `${asset.toLowerCase()}usdt`;
+        try {
+          await createNewSymbolBot(undefined, {
+            symbol,
+            interval: "5m",
+            entryMessage: `ENTER-LONG_BINANCE_${symbol.toUpperCase()}_AUTO`,
+            exitMessage: `EXIT-LONG_BINANCE_${symbol.toUpperCase()}_AUTO`,
+            inLong: true,
+          });
+        } catch (botErr) {
+          console.error(
+            `[${symbol}] Error creating bot:`,
+            botErr.message || botErr
+          );
+        }
+      }
+    }
 
-  // createNewSymbolBot(undefined, {
-  //   symbol: "api3usdt",
-  //   interval: "5m",
-  //   entryMessage:
-  //     "ENTER-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
-  //   exitMessage:
-  //     "EXIT-LONG_BINANCE_API3USDT_BOT-NAME-RDSh9d_5M_ed68632a927ae2e945f77585",
-  //   inLong: true,
-  // });
-
-  // Start worker on server start
-  fork("./symbolsWorker.js");
+    // Start worker on server start
+  } catch (err) {
+    console.error("Error during server startup:", err.message || err);
+  }
 });
