@@ -174,6 +174,7 @@ class SymbolBot {
 
   async sendSellOrder(price) {
     try {
+      console.log(`[${this.symbol}] Preparing to sell at price: ${price}`);
       // Get latest balances before calculation
       await getAvailableBalance();
       const assetBalance =
@@ -233,84 +234,106 @@ class SymbolBot {
     this.ws = new WebSocket(streamUrl);
 
     this.ws.on("open", () => {
-      console.log(`[${this.symbol}] WebSocket open`);
+      try {
+        console.log(`[${this.symbol}] WebSocket open`);
+      } catch (err) {
+        console.error(`[${this.symbol}] Error in open handler:`, err.message);
+      }
     });
 
     this.ws.on("message", (data) => {
-      const msg = JSON.parse(data);
-      if (msg.e !== "kline" || !msg.k.x) return;
-      const time = msg.k.t;
-      const close = parseFloat(msg.k.c);
+      try {
+        const msg = JSON.parse(data);
+        if (msg.e !== "kline" || !msg.k.x) return;
+        const time = msg.k.t;
+        const close = parseFloat(msg.k.c);
 
-      const currRsi = this.rsi.nextValue(close);
+        const currRsi = this.rsi.nextValue(close);
 
-      // We need at least two RSI values to check for a crossover
-      if (this.prevRsi === null || currRsi === undefined) {
-        if (currRsi !== undefined) {
-          this.prevRsi = currRsi;
+        // We need at least two RSI values to check for a crossover
+        if (this.prevRsi === null || currRsi === undefined) {
+          if (currRsi !== undefined) {
+            this.prevRsi = currRsi;
+          }
+          return;
         }
-        return;
+
+        console.log(
+          `[${this.symbol}] close=${close} prevRsi=${this.prevRsi.toFixed(
+            2
+          )} currRsi=${currRsi.toFixed(2)} inLong=${this.inLong}`
+        );
+
+        // 4) entry crossover
+        if (
+          !this.inLong &&
+          this.prevRsi <= rsiConfig.entry &&
+          currRsi > rsiConfig.entry
+        ) {
+          this.sendBuyOrder(close);
+          this.inLong = true;
+        }
+
+        // 5) exit crossunder
+        if (
+          this.inLong &&
+          this.prevRsi >= rsiConfig.exit &&
+          currRsi < rsiConfig.exit
+        ) {
+          const payload = {
+            symbol: this.symbol.toUpperCase(),
+            type: "EXIT-LONG",
+            price: close,
+            time,
+            comment: this.exitMessage,
+          };
+          this.sendSellOrder(close);
+          this.inLong = false;
+        }
+
+        this.prevRsi = currRsi;
+      } catch (err) {
+        console.error(
+          `[${this.symbol}] Error in message handler:`,
+          err.message
+        );
       }
-
-      console.log(
-        `[${this.symbol}] close=${close} prevRsi=${this.prevRsi.toFixed(
-          2
-        )} currRsi=${currRsi.toFixed(2)} inLong=${this.inLong}`
-      );
-
-      // 4) entry crossover
-      if (
-        !this.inLong &&
-        this.prevRsi <= rsiConfig.entry &&
-        currRsi > rsiConfig.entry
-      ) {
-        // const payload = {
-        //   symbol: this.symbol.toUpperCase(),
-        //   type: "ENTER-LONG",
-        //   price: close,
-        //   time,
-        //   comment: this.entryMessage,
-        // };
-        this.sendBuyOrder(close);
-        // this.sendWebhook(payload);
-        this.inLong = true;
-      }
-
-      // 5) exit crossunder
-      if (
-        this.inLong &&
-        this.prevRsi >= rsiConfig.exit &&
-        currRsi < rsiConfig.exit
-      ) {
-        const payload = {
-          symbol: this.symbol.toUpperCase(),
-          type: "EXIT-LONG",
-          price: close,
-          time,
-          comment: this.exitMessage,
-        };
-        // this.sendWebhook(payload);
-        this.sendBuyOrder(price);
-        this.inLong = false;
-      }
-
-      this.prevRsi = currRsi;
     });
 
-    this.ws.on("error", (err) =>
-      console.error(`[${this.symbol}] WS error:`, err.message)
-    );
-    this.ws.on("close", () => console.log(`[${this.symbol}] WebSocket closed`));
+    this.ws.on("error", (err) => {
+      try {
+        console.error(`[${this.symbol}] WS error:`, err.message);
+      } catch (e) {
+        console.error(`[${this.symbol}] Error in error handler:`, e.message);
+      }
+    });
+
+    this.ws.on("close", () => {
+      try {
+        console.log(`[${this.symbol}] WebSocket closed`);
+      } catch (err) {
+        console.error(`[${this.symbol}] Error in close handler:`, err.message);
+      }
+    });
   }
 
   async start() {
-    await this.seedHistoricalCloses();
-    this.startStream();
+    try {
+      await this.seedHistoricalCloses();
+      this.startStream();
+    } catch (err) {
+      console.error(`[${this.symbol}] Error in start:`, err.message);
+      throw err;
+    }
   }
 
   stop() {
-    if (this.ws) this.ws.close();
-    console.log(`[${this.symbol}] Stopped`);
+    try {
+      if (this.ws) this.ws.close();
+      console.log(`[${this.symbol}] Stopped`);
+    } catch (err) {
+      console.error(`[${this.symbol}] Error in stop:`, err.message);
+    }
   }
 }
 const createNewSymbolBot = async (
