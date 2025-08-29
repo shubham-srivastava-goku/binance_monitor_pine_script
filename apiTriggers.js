@@ -48,12 +48,18 @@ async function triggerListSymbols() {
   }
 }
 
-// Function to trigger PATCH /symbols/:symbol/status
-async function triggerUpdateSymbolStatus(symbol, inLong) {
+/**
+ * Triggers PATCH /symbols/:symbol/status with a flexible payload.
+ * @param {string} symbol - The trading symbol.
+ * @param {Object} statusParams - The status parameters (e.g., { inLong, buyLimit, interval }).
+ * @returns {Promise<Object>} - The response from the backend.
+ */
+async function triggerUpdateSymbolStatus(symbol, statusParams) {
   try {
-    const res = await axios.patch(`${BASE_URL}/symbols/${symbol}/status`, {
-      inLong,
-    });
+    const res = await axios.patch(
+      `${BASE_URL}/symbols/${symbol}/status`,
+      statusParams
+    );
     console.log("Update Symbol Status Response:", res.data);
     return res.data;
   } catch (err) {
@@ -138,9 +144,9 @@ const orderParamsExample = {
 // Uncomment to run examples directly
 // runExampleTriggers();
 
-// triggerUpdateSymbolStatus("avaxusdt", false);
-triggerUpdateSymbolStatus("ethusdt", false);
-// triggerUpdateSymbolStatus("solusdt", false);
+// triggerUpdateSymbolStatus("avaxusdt", { inLong: true, buyLimit: 15 });
+// triggerUpdateSymbolStatus("ethusdt", { inLong: true, buyLimit: 15 });
+triggerUpdateSymbolStatus("solusdt", { inLong: false, buyLimit: 15 });
 // triggerDeleteSymbol("avaxusdt");
 // triggerDeleteSymbol('solusdt');
 // triggerDeleteSymbol("ethusdt");
@@ -159,11 +165,7 @@ triggerUpdateSymbolStatus("ethusdt", false);
 // triggerAddSymbol({
 //   symbol: "ethusdt",
 //   interval: "5m",
-//   entryMessage:
-//     "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_AVAXUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
-//   exitMessage:
-//     "EXIT-LONG_BINANCE_MULTIPLE-PAIRS_AVAXUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
-//   inLong: true,
+//   inLong: false,
 // });
 
 // triggerWebhook("ethusdt", {

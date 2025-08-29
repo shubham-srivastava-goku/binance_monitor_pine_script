@@ -168,6 +168,7 @@ class SymbolBot {
         `[${this.symbol}] Buy order error:`,
         err.body || err.message
       );
+      throw err;
     }
   }
 
@@ -224,6 +225,7 @@ class SymbolBot {
         `[${this.symbol}] Sell order error:`,
         err.body || err.message
       );
+      throw err;
     }
   }
 
