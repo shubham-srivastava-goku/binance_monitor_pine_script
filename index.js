@@ -45,25 +45,25 @@ const getAvailableBalance = async () => {
 };
 
 class SymbolBot {
-  constructor({ symbol, interval, entryMessage, exitMessage }) {
+  constructor({ symbol, interval, buyLimit }) {
     this.symbol = symbol.toLowerCase();
     this.interval = interval;
-    this.entryMessage = entryMessage;
-    this.exitMessage = exitMessage;
     this.closes = [];
-    this.rsi = null; // Store the RSI instance
+    this.rsi = null;
     this.prevRsi = null;
     this.inLong = false;
     this.ws = null;
-    this.symbolQuntity =
+    this.symbolQuantity =
       availableBalance[symbol.replace("usdt", "").toUpperCase()]?.available ||
       0;
     this.usdtQuantity = availableBalance["USDT"]?.available || 0;
+    this.reconnectAttempts = 0;
+    this.buyLimit = typeof buyLimit === "number" ? buyLimit : Infinity;
   }
 
   async seedHistoricalCloses() {
     try {
-      const limit = rsiConfig.period + 10; // Get more data than the minimum to be safe
+      const limit = rsiConfig.period + 10;
       const url =
         `https://api.binance.com/api/v3/klines` +
         `?symbol=${this.symbol.toUpperCase()}` +
@@ -72,16 +72,13 @@ class SymbolBot {
       const resp = await axios.get(url);
       const historicalCloses = resp.data.map((k) => parseFloat(k[4]));
 
-      // Use RSI.calculate on the full history to get all historical RSI values
       const rsiArray = RSI.calculate({
         values: historicalCloses,
         period: rsiConfig.period,
       });
 
-      // Initialize the streaming RSI with an empty array
       this.rsi = new RSI({ period: rsiConfig.period, values: [] });
 
-      // Seed the streaming RSI instance with the data
       historicalCloses.forEach((close) => this.rsi.nextValue(close));
 
       this.prevRsi = rsiArray[rsiArray.length - 1];
@@ -118,16 +115,20 @@ class SymbolBot {
 
   async sendBuyOrder(price) {
     try {
-      console.log(
-        `[${this.symbol}] Preparing to buy. USDT balance: ${this.usdtQuantity}, price: ${price}`
-      );
-
-      // Get latest balances before calculation
       await getAvailableBalance();
       const usdtBalance = availableBalance["USDT"]?.available || 0;
-      console.log(`[${this.symbol}] Fresh USDT balance: ${usdtBalance}`);
+      if (usdtBalance < 5) {
+        console.warn(
+          `[${this.symbol}] Insufficient USDT balance to place buy order: ${usdtBalance}`
+        );
+        throw new Error("Insufficient USDT balance");
+      }
+      const maxUsdtToUse = Math.min(usdtBalance, this.buyLimit);
 
-      // Get exchange info for stepSize
+      console.log(
+        `[${this.symbol}] Preparing to buy. USDT balance: ${usdtBalance}, buy limit: ${this.buyLimit}, using: ${maxUsdtToUse}, price: ${price}`
+      );
+
       const info = await binance.exchangeInfo();
       const symbolInfo = info.symbols.find(
         (s) => s.symbol === this.symbol.toUpperCase()
@@ -135,9 +136,7 @@ class SymbolBot {
       const stepSize = parseFloat(
         symbolInfo.filters.find((f) => f.filterType === "LOT_SIZE").stepSize
       );
-      console.log(`[${this.symbol}] Step size for quantity: ${stepSize}`);
-
-      let quantity = usdtBalance / price;
+      let quantity = maxUsdtToUse / price;
       quantity = Math.floor(quantity / stepSize) * stepSize;
       quantity = quantity.toFixed(8);
 
@@ -145,24 +144,24 @@ class SymbolBot {
         `[${this.symbol}] Calculated buy quantity (rounded): ${quantity}`
       );
 
-      const order = await binance.buy(
+      const order = await binance.marketBuy(
         this.symbol.toUpperCase(),
-        quantity,
-        price,
-        {
-          type: "LIMIT",
-        }
+        quantity
       );
-      console.log(`[${this.symbol}] Buy order placed:`, order);
+      if (order.status !== "FILLED") {
+        console.warn(`[${this.symbol}] Buy order not filled:`, order);
+      } else {
+        console.log(`[${this.symbol}] Buy order filled:`, order);
+      }
 
       // Update balances after buy
       await getAvailableBalance();
-      this.symbolQuntity =
+      this.symbolQuantity =
         availableBalance[this.symbol.replace("usdt", "").toUpperCase()]
           ?.available || 0;
       this.usdtQuantity = availableBalance["USDT"]?.available || 0;
       console.log(
-        `[${this.symbol}] Updated balances after buy. Symbol quantity: ${this.symbolQuntity}, USDT quantity: ${this.usdtQuantity}`
+        `[${this.symbol}] Updated balances after buy. Symbol quantity: ${this.symbolQuantity}, USDT quantity: ${this.usdtQuantity}`
       );
     } catch (err) {
       console.error(
@@ -174,12 +173,12 @@ class SymbolBot {
 
   async sendSellOrder(price) {
     try {
-      console.log(`[${this.symbol}] Preparing to sell at price: ${price}`);
-      // Get latest balances before calculation
       await getAvailableBalance();
       const assetBalance =
         availableBalance[this.symbol.replace("usdt", "").toUpperCase()]
           ?.available || 0;
+
+      console.log(`[${this.symbol}] Preparing to sell at price: ${price}`);
       console.log(
         `[${this.symbol}] Preparing to sell. Symbol quantity: ${assetBalance}, price: ${price}`
       );
@@ -202,24 +201,23 @@ class SymbolBot {
         `[${this.symbol}] Calculated sell quantity (rounded): ${quantity}`
       );
 
-      const order = await binance.sell(
+      // FIX 5: Check order status
+      const order = await binance.marketSell(
         this.symbol.toUpperCase(),
-        quantity,
-        price,
-        {
-          type: "LIMIT",
-        }
+        quantity
       );
-      console.log(`[${this.symbol}] Sell order placed:`, order);
-
-      // Update balances after sell
+      if (order.status !== "FILLED") {
+        console.warn(`[${this.symbol}] Sell order not filled:`, order);
+      } else {
+        console.log(`[${this.symbol}] Sell order filled:`, order);
+      }
       await getAvailableBalance();
-      this.symbolQuntity =
+      this.symbolQuantity =
         availableBalance[this.symbol.replace("usdt", "").toUpperCase()]
           ?.available || 0;
       this.usdtQuantity = availableBalance["USDT"]?.available || 0;
       console.log(
-        `[${this.symbol}] Updated balances after sell. Symbol quantity: ${this.symbolQuntity}, USDT quantity: ${this.usdtQuantity}`
+        `[${this.symbol}] Updated balances after sell. Symbol quantity: ${this.symbolQuantity}, USDT quantity: ${this.usdtQuantity}`
       );
     } catch (err) {
       console.error(
@@ -231,90 +229,110 @@ class SymbolBot {
 
   startStream() {
     const streamUrl = `wss://stream.binance.com:9443/ws/${this.symbol}@kline_${this.interval}`;
-    this.ws = new WebSocket(streamUrl);
+    const connect = () => {
+      this.ws = new WebSocket(streamUrl);
 
-    this.ws.on("open", () => {
-      try {
+      this.ws.on("open", () => {
+        this.reconnectAttempts = 0;
         console.log(`[${this.symbol}] WebSocket open`);
-      } catch (err) {
-        console.error(`[${this.symbol}] Error in open handler:`, err.message);
-      }
-    });
+      });
 
-    this.ws.on("message", (data) => {
-      try {
-        const msg = JSON.parse(data);
-        if (msg.e !== "kline" || !msg.k.x) return;
-        const time = msg.k.t;
-        const close = parseFloat(msg.k.c);
+      this.ws.on("message", (data) => {
+        try {
+          const msg = JSON.parse(data);
+          if (msg.e !== "kline" || !msg.k.x) return;
+          const time = msg.k.t;
+          const close = parseFloat(msg.k.c);
 
-        const currRsi = this.rsi.nextValue(close);
+          const currRsi = this.rsi.nextValue(close);
 
-        // We need at least two RSI values to check for a crossover
-        if (this.prevRsi === null || currRsi === undefined) {
-          if (currRsi !== undefined) {
-            this.prevRsi = currRsi;
+          // We need at least two RSI values to check for a crossover
+          if (this.prevRsi === null || currRsi === undefined) {
+            if (currRsi !== undefined) {
+              this.prevRsi = currRsi;
+            }
+            return;
           }
-          return;
+
+          console.log(
+            `[${this.symbol}] close=${close} prevRsi=${this.prevRsi.toFixed(
+              2
+            )} currRsi=${currRsi.toFixed(2)} inLong=${this.inLong}`
+          );
+
+          // 4) entry crossover
+          if (
+            !this.inLong &&
+            this.prevRsi <= rsiConfig.entry &&
+            currRsi > rsiConfig.entry
+          ) {
+            this.sendBuyOrder(close)
+              .then(() => {
+                this.inLong = true;
+              })
+              .catch((err) => {
+                console.error(
+                  `[${this.symbol}] Buy order failed, not setting inLong:`,
+                  err.message || err
+                );
+              });
+          }
+
+          // 5) exit crossunder
+          if (
+            this.inLong &&
+            this.prevRsi >= rsiConfig.exit &&
+            currRsi < rsiConfig.exit
+          ) {
+            this.sendSellOrder(close)
+              .then(() => {
+                this.inLong = false;
+              })
+              .catch((err) => {
+                console.error(
+                  `[${this.symbol}] Sell order failed, not resetting inLong:`,
+                  err.message || err
+                );
+              });
+          }
+
+          this.prevRsi = currRsi;
+        } catch (err) {
+          console.error(
+            `[${this.symbol}] Error in message handler:`,
+            err.message
+          );
         }
+      });
 
-        console.log(
-          `[${this.symbol}] close=${close} prevRsi=${this.prevRsi.toFixed(
-            2
-          )} currRsi=${currRsi.toFixed(2)} inLong=${this.inLong}`
-        );
-
-        // 4) entry crossover
-        if (
-          !this.inLong &&
-          this.prevRsi <= rsiConfig.entry &&
-          currRsi > rsiConfig.entry
-        ) {
-          this.sendBuyOrder(close);
-          this.inLong = true;
-        }
-
-        // 5) exit crossunder
-        if (
-          this.inLong &&
-          this.prevRsi >= rsiConfig.exit &&
-          currRsi < rsiConfig.exit
-        ) {
-          const payload = {
-            symbol: this.symbol.toUpperCase(),
-            type: "EXIT-LONG",
-            price: close,
-            time,
-            comment: this.exitMessage,
-          };
-          this.sendSellOrder(close);
-          this.inLong = false;
-        }
-
-        this.prevRsi = currRsi;
-      } catch (err) {
-        console.error(
-          `[${this.symbol}] Error in message handler:`,
-          err.message
-        );
-      }
-    });
-
-    this.ws.on("error", (err) => {
-      try {
+      this.ws.on("error", (err) => {
         console.error(`[${this.symbol}] WS error:`, err.message);
-      } catch (e) {
-        console.error(`[${this.symbol}] Error in error handler:`, e.message);
-      }
-    });
+        // FIX 4: Attempt reconnect on error
+        this.tryReconnect(connect);
+      });
 
-    this.ws.on("close", () => {
-      try {
+      this.ws.on("close", () => {
         console.log(`[${this.symbol}] WebSocket closed`);
-      } catch (err) {
-        console.error(`[${this.symbol}] Error in close handler:`, err.message);
-      }
-    });
+        // FIX 4: Attempt reconnect on close
+        this.tryReconnect(connect);
+      });
+    };
+
+    connect();
+  }
+
+  tryReconnect(connectFn) {
+    if (this.reconnectAttempts < 5) {
+      this.reconnectAttempts++;
+      setTimeout(() => {
+        console.log(
+          `[${this.symbol}] Attempting reconnect #${this.reconnectAttempts}`
+        );
+        connectFn();
+      }, 1000 * this.reconnectAttempts);
+    } else {
+      console.error(`[${this.symbol}] Max reconnect attempts reached.`);
+    }
   }
 
   async start() {
@@ -336,15 +354,23 @@ class SymbolBot {
     }
   }
 }
+
+// FIX: Prevent duplicate long positions
 const createNewSymbolBot = async (
   res,
-  { symbol: key, interval, entryMessage, exitMessage, inLong }
+  { symbol: key, interval, inLong, buyLimit }
 ) => {
+  if (bots.has(key)) {
+    res &&
+      res
+        .status(409)
+        .json({ error: "Bot for this symbol already exists", symbol: key });
+    return;
+  }
   const bot = new SymbolBot({
     symbol: key,
     interval,
-    entryMessage,
-    exitMessage,
+    buyLimit,
   });
   if (typeof inLong === "boolean") {
     bot.inLong = inLong;
@@ -362,7 +388,6 @@ const createNewSymbolBot = async (
   }
 };
 
-// Move route logic to routes.js
 const routes = require("./routes")(
   bots,
   rsiConfig,
@@ -391,9 +416,7 @@ app.listen(PORT, async () => {
           await createNewSymbolBot(undefined, {
             symbol,
             interval: "5m",
-            entryMessage: `ENTER-LONG_BINANCE_${symbol.toUpperCase()}_AUTO`,
-            exitMessage: `EXIT-LONG_BINANCE_${symbol.toUpperCase()}_AUTO`,
-            inLong: true,
+            inLong: balance > 0.1,
           });
         } catch (botErr) {
           console.error(

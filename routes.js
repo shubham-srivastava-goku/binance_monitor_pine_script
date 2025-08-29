@@ -4,8 +4,8 @@ const router = express.Router();
 module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
   // POST /symbols – add & start a bot
   router.post("/symbols", async (req, res) => {
-    const { symbol, interval, entryMessage, exitMessage, inLong } = req.body;
-    if (!symbol || !interval || !entryMessage || !exitMessage) {
+    const { symbol, interval, inLong } = req.body;
+    if (!symbol || !interval) {
       return res.status(400).json({ error: "Missing required fields" });
     }
     const key = symbol.toLowerCase();
@@ -15,8 +15,6 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
     await createNewSymbolBot(res, {
       symbol: key,
       interval,
-      entryMessage,
-      exitMessage,
       inLong,
     });
   });
@@ -38,26 +36,35 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
       list.push({
         symbol: key,
         interval: bot.interval,
-        entryMessage: bot.entryMessage,
-        exitMessage: bot.exitMessage,
         inLong: bot.inLong,
       });
     }
     res.json(list);
   });
 
-  // PATCH /symbols/:symbol/status – update inLong status
-  router.patch("/symbols/:symbol/status", (req, res) => {
-    const key = req.params.symbol.toLowerCase();
-    const bot = bots.get(key);
-    if (!bot) return res.status(404).json({ error: "Symbol not found" });
+  router.patch("/symbols/:symbol/status", async (req, res) => {
+    const symbol = req.params.symbol.toLowerCase();
+    const bot = bots.get(symbol);
+    if (!bot) {
+      return res.status(404).json({ error: "Bot not found for symbol" });
+    }
 
-    const { inLong } = req.body;
-    if (typeof inLong !== "boolean")
-      return res.status(400).json({ error: "inLong must be boolean" });
+    // Update inLong status if provided
+    if (typeof req.body.inLong === "boolean") {
+      bot.inLong = req.body.inLong;
+    }
 
-    bot.inLong = inLong;
-    res.json({ message: "Status updated", symbol: key, inLong: bot.inLong });
+    // Update buyLimit if provided
+    if (typeof req.body.buyLimit === "number" && req.body.buyLimit > 0) {
+      bot.buyLimit = req.body.buyLimit;
+    }
+
+    res.json({
+      symbol,
+      inLong: bot.inLong,
+      buyLimit: bot.buyLimit,
+      message: "Bot status updated",
+    });
   });
 
   // PATCH /rsi-config – update RSI parameters
@@ -136,52 +143,6 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
       console.error("Order Error:", err.body || err.message);
       res.status(err.status || 500).json({ error: err.body || err.message });
     }
-
-    // if (!apiKey || !apiSecret) {
-    //   return res.status(500).json({ error: "Binance API credentials not set" });
-    // }
-
-    // const baseUrl = "https://api.binance.com";
-    // const endpoint = "/api/v3/order";
-    // const params = req.body;
-
-    // // Add timestamp if not present
-    // params.timestamp = params.timestamp || Date.now();
-
-    // // Create query string
-    // const query = Object.entries(params)
-    //   .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-    //   .join("&");
-
-    // // Sign the query string
-    // const signature = crypto
-    //   .createHmac("sha256", apiSecret)
-    //   .update(query)
-    //   .digest("hex");
-
-    // // Final query string with signature
-    // const finalQuery = `${query}&signature=${signature}`;
-    // console.log("Final Query:", finalQuery);
-    // console.log("Request Body:", params);
-
-    // try {
-    //   const response = await axios.post(
-    //     `${baseUrl}${endpoint}?${finalQuery}`,
-    //     {},
-    //     {
-    //       headers: {
-    //         "X-MBX-APIKEY": apiKey,
-    //         "Content-Type": "application/json",
-    //       },
-    //     }
-    //   );
-    //   res.json(response.data);
-    // } catch (err) {
-    //   console.error("Order Error:", err.response?.data || err.message);
-    //   res
-    //     .status(err.response?.status || 500)
-    //     .json({ error: err.response?.data || err.message });
-    // }
   });
 
   return router;

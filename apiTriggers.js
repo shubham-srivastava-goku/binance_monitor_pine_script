@@ -133,13 +133,38 @@ const orderParamsExample = {
   // recvWindow: 5000,
 };
 
-triggerOrder(orderParamsExample);
+// triggerOrder(orderParamsExample);
 
 // Uncomment to run examples directly
 // runExampleTriggers();
 
-// triggerUpdateSymbolStatus("api3usdt", true);
+// triggerUpdateSymbolStatus("avaxusdt", false);
+triggerUpdateSymbolStatus("ethusdt", false);
+// triggerUpdateSymbolStatus("solusdt", false);
+// triggerDeleteSymbol("avaxusdt");
+// triggerDeleteSymbol('solusdt');
+// triggerDeleteSymbol("ethusdt");
 // triggerListSymbols();
+
+// triggerAddSymbol({
+//   symbol: "avaxusdt",
+//   interval: "5m",
+//   entryMessage:
+//     "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_AVAXUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+//   exitMessage:
+//     "EXIT-LONG_BINANCE_MULTIPLE-PAIRS_AVAXUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+//   inLong: true,
+// });
+
+// triggerAddSymbol({
+//   symbol: "ethusdt",
+//   interval: "5m",
+//   entryMessage:
+//     "ENTER-LONG_BINANCE_MULTIPLE-PAIRS_AVAXUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+//   exitMessage:
+//     "EXIT-LONG_BINANCE_MULTIPLE-PAIRS_AVAXUSDT-TYb3rA_5M_ed54632ab97ae2e94555752e",
+//   inLong: true,
+// });
 
 // triggerWebhook("ethusdt", {
 //   comment:
