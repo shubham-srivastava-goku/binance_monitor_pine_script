@@ -4,7 +4,7 @@ const router = express.Router();
 module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
   // POST /symbols – add & start a bot
   router.post("/symbols", async (req, res) => {
-    const { symbol, interval, inLong } = req.body;
+    const { symbol, interval, inLong, buyLimit } = req.body;
     if (!symbol || !interval) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -16,6 +16,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
       symbol: key,
       interval,
       inLong,
+      buyLimit,
     });
   });
 
@@ -37,6 +38,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
         symbol: key,
         interval: bot.interval,
         inLong: bot.inLong,
+        buyLimit: bot.buyLimit,
       });
     }
     res.json(list);
@@ -48,6 +50,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
     if (!bot) {
       return res.status(404).json({ error: "Bot not found for symbol" });
     }
+    console.log("Update request body:", req.body, req.body.buyLimit);
 
     // Update inLong status if provided
     if (typeof req.body.inLong === "boolean") {
@@ -61,8 +64,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
 
     res.json({
       symbol,
-      inLong: bot.inLong,
-      buyLimit: bot.buyLimit,
+      ...bot,
       message: "Bot status updated",
     });
   });

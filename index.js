@@ -419,6 +419,7 @@ app.listen(PORT, async () => {
             symbol,
             interval: "5m",
             inLong: balance > 0.1,
+            buyLimit: 15,
           });
         } catch (botErr) {
           console.error(

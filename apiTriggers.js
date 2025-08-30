@@ -4,20 +4,13 @@ const BASE_URL =
   process.env.HOST || "https://binance-monitor-pine-script.onrender.com";
 
 // Function to trigger POST /symbols
-async function triggerAddSymbol({
-  symbol,
-  interval,
-  entryMessage,
-  exitMessage,
-  inLong,
-}) {
+async function triggerAddSymbol({ symbol, interval, inLong, buyLimit }) {
   try {
     const res = await axios.post(`${BASE_URL}/symbols`, {
       symbol,
       interval,
-      entryMessage,
-      exitMessage,
       inLong,
+      buyLimit,
     });
     console.log("Add Symbol Response:", res.data);
     return res.data;
@@ -162,11 +155,14 @@ triggerUpdateSymbolStatus("solusdt", { inLong: false, buyLimit: 15 });
 //   inLong: true,
 // });
 
-// triggerAddSymbol({
-//   symbol: "ethusdt",
-//   interval: "5m",
-//   inLong: false,
-// });
+triggerAddSymbol({
+  symbol: "ethusdt",
+  interval: "5m",
+  inLong: false,
+  buyLimit: 15,
+});
+
+// triggerListSymbols();
 
 // triggerWebhook("ethusdt", {
 //   comment:
