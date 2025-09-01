@@ -5,6 +5,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
   // POST /symbols – add & start a bot
   router.post("/symbols", async (req, res) => {
     const { symbol, interval, inLong, buyLimit } = req.body;
+    console.log("Received request to add symbol:", req.body);
     if (!symbol || !interval) {
       return res.status(400).json({ error: "Missing required fields" });
     }

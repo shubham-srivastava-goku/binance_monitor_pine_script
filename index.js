@@ -398,6 +398,18 @@ const routes = require("./routes")(
 );
 app.use("/", routes);
 
+const defaultBot = [
+  "ethusdt",
+  "xrpusdt",
+  "dogeusdt",
+  "bnbusdt",
+  "wlfiusdt",
+  "solusdt",
+  "avaxusdt",
+  "linkusdt",
+  "trxusdt",
+];
+
 // Start server
 app.listen(PORT, async () => {
   console.log(`API server listening on port ${PORT}`);
@@ -406,30 +418,28 @@ app.listen(PORT, async () => {
     await getAvailableBalance();
 
     // Create bots for all assets except USDT with available balance > 0
-    for (const asset in availableBalance) {
+    for (const asset in defaultBot) {
+      asset = defaultBot[asset].replace("usdt", "").toUpperCase();
       if (asset === "USDT") continue;
       const balance = parseFloat(availableBalance[asset]?.available || "0");
-      if (balance > 0) {
-        console.log(
-          `Creating bot for ${asset} with available balance: ${balance}`
+      console.log(
+        `Creating bot for ${asset} with available balance: ${balance}`
+      );
+      const symbol = `${asset.toLowerCase()}usdt`;
+      try {
+        await createNewSymbolBot(undefined, {
+          symbol,
+          interval: "5m",
+          inLong: balance > 0.1,
+          buyLimit: 15,
+        });
+      } catch (botErr) {
+        console.error(
+          `[${symbol}] Error creating bot:`,
+          botErr.message || botErr
         );
-        const symbol = `${asset.toLowerCase()}usdt`;
-        try {
-          await createNewSymbolBot(undefined, {
-            symbol,
-            interval: "5m",
-            inLong: balance > 0.1,
-            buyLimit: 15,
-          });
-        } catch (botErr) {
-          console.error(
-            `[${symbol}] Error creating bot:`,
-            botErr.message || botErr
-          );
-        }
       }
     }
-
     // Start worker on server start
   } catch (err) {
     console.error("Error during server startup:", err.message || err);
