@@ -400,8 +400,6 @@ app.use("/", routes);
 
 const defaultBot = [
   "ethusdt",
-  "xrpusdt",
-  "dogeusdt",
   "bnbusdt",
   "wlfiusdt",
   "solusdt",
@@ -418,8 +416,8 @@ app.listen(PORT, async () => {
     await getAvailableBalance();
 
     // Create bots for all assets except USDT with available balance > 0
-    for (const asset in defaultBot) {
-      asset = defaultBot[asset].replace("usdt", "").toUpperCase();
+    for (const index in defaultBot) {
+      const asset = defaultBot[index].replace("usdt", "").toUpperCase();
       if (asset === "USDT") continue;
       const balance = parseFloat(availableBalance[asset]?.available || "0");
       console.log(
