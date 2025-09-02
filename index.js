@@ -138,7 +138,8 @@ class SymbolBot {
       );
       let quantity = maxUsdtToUse / price;
       quantity = Math.floor(quantity / stepSize) * stepSize;
-      quantity = quantity.toFixed(8);
+      quantity =
+        this.symbol === "wlfiusdt" ? quantity.toFixed(4) : quantity.toFixed(8);
 
       console.log(
         `[${this.symbol}] Calculated buy quantity (rounded): ${quantity}`
