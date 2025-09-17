@@ -139,7 +139,8 @@ class SymbolBot {
     }
   }
 
-  async sendBuyOrder(price) {
+  // Rename the original sendBuyOrder to _actualSendBuyOrder
+  async _actualSendBuyOrder(price) {
     try {
       await getAvailableBalance();
       const usdtBalance = availableBalance["USDT"]?.available || 0;
@@ -398,6 +399,33 @@ class SymbolBot {
     }
   }
 }
+
+// Global buy order queue and lock
+const buyOrderQueue = [];
+let buyOrderInProgress = false;
+
+async function processBuyOrderQueue() {
+  if (buyOrderInProgress || buyOrderQueue.length === 0) return;
+  buyOrderInProgress = true;
+  const { bot, price, resolve, reject } = buyOrderQueue.shift();
+  try {
+    const result = await bot._actualSendBuyOrder(price);
+    resolve(result);
+  } catch (err) {
+    reject(err);
+  } finally {
+    buyOrderInProgress = false;
+    processBuyOrderQueue();
+  }
+}
+
+// Patch SymbolBot to use the queue for buy orders
+SymbolBot.prototype.sendBuyOrder = function(price) {
+  return new Promise((resolve, reject) => {
+    buyOrderQueue.push({ bot: this, price, resolve, reject });
+    processBuyOrderQueue();
+  });
+};
 
 // FIX: Prevent duplicate long positions
 const createNewSymbolBot = async (
