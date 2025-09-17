@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
+module.exports = (bots, rsiConfig, createNewSymbolBot, SYMBOL_RSI_CONFIGS) => {
   // POST /symbols – add & start a bot
   router.post("/symbols", async (req, res) => {
     const { symbol, interval, inLong, buyLimit } = req.body;
@@ -66,6 +66,7 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
         interval: bot.interval,
         inLong: bot.inLong,
         buyLimit: bot.buyLimit,
+        rsiConfig: bot.rsiConfig,
       });
     }
     res.json(list);
@@ -98,8 +99,9 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
 
   // PATCH /symbols/:symbol/rsi-config - update RSI configuration for a specific bot
   router.patch("/symbols/:symbol/rsi-config", async (req, res) => {
+    const symbol = req.params.symbol.toLowerCase();
+    console.log(`Received RSI config update for ${symbol}:`, req.body);
     try {
-      const symbol = req.params.symbol.toLowerCase();
       const bot = bots.get(symbol);
 
       if (!bot) {

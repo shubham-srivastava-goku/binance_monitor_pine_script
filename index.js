@@ -24,8 +24,8 @@ const DEFAULT_RSI_CONFIG = {
 
 // Add symbol-specific RSI configurations
 const SYMBOL_RSI_CONFIGS = {
-  // ethusdt: { entry: 80, exit: 20 },
-  // bnbusdt: { entry: 82, exit: 22 },
+  trxusdt: { entry: 65, exit: 20 },
+  bnbusdt: { entry: 65, exit: 20 },
   // Add other symbol-specific configs as needed
 };
 
@@ -111,8 +111,7 @@ class SymbolBot {
       this.prevRsi = rsiArray[rsiArray.length - 1];
 
       console.log(
-        `[${this.symbol}] Seeded closes=${
-          historicalCloses.length
+        `[${this.symbol}] Seeded closes=${historicalCloses.length
         }, initial RSI=${this.prevRsi.toFixed(2)}`
       );
     } catch (err) {
@@ -438,7 +437,7 @@ const routes = require("./routes")(
   bots,
   rsiConfig,
   createNewSymbolBot,
-  binance
+  SYMBOL_RSI_CONFIGS
 );
 app.use("/", routes);
 

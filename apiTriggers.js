@@ -63,6 +63,28 @@ async function triggerUpdateSymbolStatus(symbol, statusParams) {
   }
 }
 
+/**
+ * Triggers PATCH /symbols/:symbol/rsi-config to update RSI configuration for a specific bot.
+ * @param {string} symbol - The trading symbol (e.g., 'ethusdt').
+ * @param {Object} rsiConfig - The RSI config object (e.g., { entry, exit, period }).
+ * @returns {Promise<Object>} - The response from the backend.
+ */
+async function triggerUpdateSymbolRsiConfig(symbol, rsiConfig) {
+  try {
+    const res = await axios.patch(
+      `${BASE_URL}/symbols/${symbol}/rsi-config`,
+      rsiConfig
+    );
+    console.log("Update Symbol RSI Config Response:", res.data);
+    return res.data;
+  } catch (err) {
+    console.error(
+      "Update Symbol RSI Config Error:",
+      err.response?.data || err.message
+    );
+  }
+}
+
 // Example calls using values from index.js line 209
 async function runExampleTriggers() {
   await triggerAddSymbol({
@@ -145,8 +167,13 @@ const orderParamsExample = {
 // triggerUpdateSymbolStatus("bnbusdt", { inLong: false, buyLimit: 15 });
 // triggerDeleteSymbol("avaxusdt");
 // triggerDeleteSymbol('solusdt');
-triggerDeleteSymbol("bnbusdt");
+// triggerDeleteSymbol("bnbusdt");
 // triggerListSymbols();
+
+triggerListSymbols();
+
+// triggerUpdateSymbolRsiConfig("trxusdt", { entry: 65, exit: 20 });
+// triggerUpdateSymbolRsiConfig("bnbusdt", { entry: 65, exit: 20 });
 
 // triggerAddSymbol({
 //   symbol: "avaxusdt",
@@ -186,4 +213,5 @@ module.exports = {
   triggerUpdateSymbolStatus,
   triggerWebhook,
   triggerOrder,
+  triggerUpdateSymbolRsiConfig,
 };
