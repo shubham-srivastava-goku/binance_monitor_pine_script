@@ -138,11 +138,14 @@ const orderParamsExample = {
 // runExampleTriggers();
 
 // triggerUpdateSymbolStatus("avaxusdt", { inLong: true, buyLimit: 15 });
-// triggerUpdateSymbolStatus("ethusdt", { inLong: true, buyLimit: 15 });
-// triggerUpdateSymbolStatus("solusdt", { inLong: false, buyLimit: 15 });
+// triggerUpdateSymbolStatus("ethusdt", { inLong: false, buyLimit: 15 });
+// triggerUpdateSymbolStatus("wlfiusdt", { inLong: false, buyLimit: 15 });
+// // triggerUpdateSymbolStatus("solusdt", { inLong: true, buyLimit: 15 });
+// triggerUpdateSymbolStatus("trxusdt", { inLong: true, buyLimit: 15 });
+// triggerUpdateSymbolStatus("bnbusdt", { inLong: false, buyLimit: 15 });
 // triggerDeleteSymbol("avaxusdt");
 // triggerDeleteSymbol('solusdt');
-// triggerDeleteSymbol("ethusdt");
+triggerDeleteSymbol("bnbusdt");
 // triggerListSymbols();
 
 // triggerAddSymbol({
@@ -155,12 +158,12 @@ const orderParamsExample = {
 //   inLong: true,
 // });
 
-triggerAddSymbol({
-  symbol: "wlfiusdt", // "ethusdt",
-  interval: "5m",
-  inLong: false,
-  buyLimit: 5,
-});
+// triggerAddSymbol({
+//   symbol: "wlfiusdt", // "ethusdt",
+//   interval: "5m",
+//   inLong: false,
+//   buyLimit: 5,
+// });
 
 // triggerAddSymbol({
 //   symbol: "dolousdt", // "ethusdt",

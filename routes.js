@@ -22,13 +22,39 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
   });
 
   // DELETE /symbols/:symbol – stop & remove a bot
-  router.delete("/symbols/:symbol", (req, res) => {
-    const key = req.params.symbol.toLowerCase();
-    const bot = bots.get(key);
-    if (!bot) return res.status(404).json({ error: "Symbol not found" });
-    bot.stop();
-    bots.delete(key);
-    res.json({ message: "Symbol removed", symbol: key });
+  router.delete("/symbols/:symbol", async (req, res) => {
+    try {
+      const key = req.params.symbol.toLowerCase();
+      const bot = bots.get(key);
+
+      if (!bot) {
+        return res.status(404).json({ error: "Symbol not found" });
+      }
+
+      // Call stop and wait for cleanup
+      const stopped = bot.stop();
+
+      if (!stopped) {
+        return res.status(500).json({
+          error: "Failed to stop the bot properly",
+          symbol: key,
+        });
+      }
+
+      // Remove from bots map
+      bots.delete(key);
+
+      res.json({
+        message: "Symbol removed successfully",
+        symbol: key,
+      });
+    } catch (err) {
+      console.error(`Error removing symbol:`, err);
+      res.status(500).json({
+        error: "Internal server error while removing symbol",
+        message: err.message,
+      });
+    }
   });
 
   // GET /symbols – list active bots
@@ -68,6 +94,75 @@ module.exports = (bots, rsiConfig, createNewSymbolBot, binance) => {
       ...bot,
       message: "Bot status updated",
     });
+  });
+
+  // PATCH /symbols/:symbol/rsi-config - update RSI configuration for a specific bot
+  router.patch("/symbols/:symbol/rsi-config", async (req, res) => {
+    try {
+      const symbol = req.params.symbol.toLowerCase();
+      const bot = bots.get(symbol);
+
+      if (!bot) {
+        return res.status(404).json({ error: "Bot not found for symbol" });
+      }
+
+      const { entry, exit, period } = req.body;
+
+      // Validate the input parameters
+      if (
+        entry !== undefined &&
+        (typeof entry !== "number" || entry < 0 || entry > 100)
+      ) {
+        return res
+          .status(400)
+          .json({ error: "Entry value must be a number between 0 and 100" });
+      }
+
+      if (
+        exit !== undefined &&
+        (typeof exit !== "number" || exit < 0 || exit > 100)
+      ) {
+        return res
+          .status(400)
+          .json({ error: "Exit value must be a number between 0 and 100" });
+      }
+
+      if (period !== undefined && (typeof period !== "number" || period < 1)) {
+        return res
+          .status(400)
+          .json({ error: "Period must be a positive number" });
+      }
+
+      // Update the bot's RSI configuration
+      if (entry !== undefined) bot.rsiConfig.entry = entry;
+      if (exit !== undefined) bot.rsiConfig.exit = exit;
+      if (period !== undefined) {
+        bot.rsiConfig.period = period;
+        // Reinitialize RSI with new period
+        bot.rsi = new RSI({ period: period, values: [] });
+        // Reseed historical closes with new period
+        await bot.seedHistoricalCloses();
+      }
+
+      // Update the global SYMBOL_RSI_CONFIGS
+      if (!SYMBOL_RSI_CONFIGS[symbol]) {
+        SYMBOL_RSI_CONFIGS[symbol] = {};
+      }
+      if (entry !== undefined) SYMBOL_RSI_CONFIGS[symbol].entry = entry;
+      if (exit !== undefined) SYMBOL_RSI_CONFIGS[symbol].exit = exit;
+
+      res.json({
+        symbol,
+        rsiConfig: bot.rsiConfig,
+        message: "RSI configuration updated successfully",
+      });
+    } catch (err) {
+      console.error(`Error updating RSI config for ${symbol}:`, err);
+      res.status(500).json({
+        error: "Internal server error while updating RSI configuration",
+        message: err.message,
+      });
+    }
   });
 
   // PATCH /rsi-config – update RSI parameters

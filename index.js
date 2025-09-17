@@ -15,6 +15,20 @@ const WEBHOOK_URL = "https://wtalerts.com/bot/custom";
 const apiKey = process.env.BINANCE_API_KEY;
 const apiSecret = process.env.BINANCE_API_SECRET;
 
+// First, let's add default RSI configs as constants
+const DEFAULT_RSI_CONFIG = {
+  period: 7,
+  entry: 85,
+  exit: 25,
+};
+
+// Add symbol-specific RSI configurations
+const SYMBOL_RSI_CONFIGS = {
+  // ethusdt: { entry: 80, exit: 20 },
+  // bnbusdt: { entry: 82, exit: 22 },
+  // Add other symbol-specific configs as needed
+};
+
 const RSI_PERIOD = 7;
 const RSI_ENTRY = 85;
 const RSI_EXIT = 25;
@@ -45,7 +59,7 @@ const getAvailableBalance = async () => {
 };
 
 class SymbolBot {
-  constructor({ symbol, interval, buyLimit }) {
+  constructor({ symbol, interval, buyLimit, rsiConfig }) {
     this.symbol = symbol.toLowerCase();
     this.interval = interval;
     this.closes = [];
@@ -59,11 +73,24 @@ class SymbolBot {
     this.usdtQuantity = availableBalance["USDT"]?.available || 0;
     this.reconnectAttempts = 0;
     this.buyLimit = typeof buyLimit === "number" ? buyLimit : Infinity;
+
+    // Set symbol-specific RSI config or use defaults
+    this.rsiConfig = {
+      period: DEFAULT_RSI_CONFIG.period,
+      entry:
+        rsiConfig?.entry ||
+        SYMBOL_RSI_CONFIGS[this.symbol]?.entry ||
+        DEFAULT_RSI_CONFIG.entry,
+      exit:
+        rsiConfig?.exit ||
+        SYMBOL_RSI_CONFIGS[this.symbol]?.exit ||
+        DEFAULT_RSI_CONFIG.exit,
+    };
   }
 
   async seedHistoricalCloses() {
     try {
-      const limit = rsiConfig.period + 10;
+      const limit = this.rsiConfig.period + 10;
       const url =
         `https://api.binance.com/api/v3/klines` +
         `?symbol=${this.symbol.toUpperCase()}` +
@@ -74,10 +101,10 @@ class SymbolBot {
 
       const rsiArray = RSI.calculate({
         values: historicalCloses,
-        period: rsiConfig.period,
+        period: this.rsiConfig.period,
       });
 
-      this.rsi = new RSI({ period: rsiConfig.period, values: [] });
+      this.rsi = new RSI({ period: this.rsiConfig.period, values: [] });
 
       historicalCloses.forEach((close) => this.rsi.nextValue(close));
 
@@ -147,7 +174,7 @@ class SymbolBot {
 
       const order = await binance.marketBuy(
         this.symbol.toUpperCase(),
-        quantity
+        parseFloat(quantity)
       );
       if (order.status !== "FILLED") {
         console.warn(`[${this.symbol}] Buy order not filled:`, order);
@@ -266,8 +293,8 @@ class SymbolBot {
           // 4) entry crossover
           if (
             !this.inLong &&
-            this.prevRsi <= rsiConfig.entry &&
-            currRsi > rsiConfig.entry
+            this.prevRsi <= this.rsiConfig.entry &&
+            currRsi > this.rsiConfig.entry
           ) {
             this.sendBuyOrder(close)
               .then(() => {
@@ -284,8 +311,8 @@ class SymbolBot {
           // 5) exit crossunder
           if (
             this.inLong &&
-            this.prevRsi >= rsiConfig.exit &&
-            currRsi < rsiConfig.exit
+            this.prevRsi >= this.rsiConfig.exit &&
+            currRsi < this.rsiConfig.exit
           ) {
             this.sendSellOrder(close)
               .then(() => {
@@ -350,10 +377,25 @@ class SymbolBot {
 
   stop() {
     try {
-      if (this.ws) this.ws.close();
-      console.log(`[${this.symbol}] Stopped`);
+      if (this.ws) {
+        // Remove all event listeners to prevent any lingering callbacks
+        this.ws.removeAllListeners();
+        // Forcefully terminate the connection
+        this.ws.terminate();
+        this.ws = null;
+      }
+
+      // Reset internal state
+      this.closes = [];
+      this.rsi = null;
+      this.prevRsi = null;
+      this.reconnectAttempts = 0;
+
+      console.log(`[${this.symbol}] Stopped and cleaned up resources`);
+      return true;
     } catch (err) {
       console.error(`[${this.symbol}] Error in stop:`, err.message);
+      return false;
     }
   }
 }
@@ -361,7 +403,7 @@ class SymbolBot {
 // FIX: Prevent duplicate long positions
 const createNewSymbolBot = async (
   res,
-  { symbol: key, interval, inLong, buyLimit }
+  { symbol: key, interval, inLong, buyLimit, rsiConfig }
 ) => {
   if (bots.has(key)) {
     res &&
@@ -374,6 +416,7 @@ const createNewSymbolBot = async (
     symbol: key,
     interval,
     buyLimit,
+    rsiConfig,
   });
   if (typeof inLong === "boolean") {
     bot.inLong = inLong;
@@ -402,7 +445,6 @@ app.use("/", routes);
 const defaultBot = [
   "ethusdt",
   "bnbusdt",
-  "wlfiusdt",
   "solusdt",
   "avaxusdt",
   "linkusdt",
@@ -431,6 +473,7 @@ app.listen(PORT, async () => {
           interval: "5m",
           inLong: balance > 0.1,
           buyLimit: 15,
+          rsiConfig: SYMBOL_RSI_CONFIGS[symbol], // Pass symbol-specific config if it exists
         });
       } catch (botErr) {
         console.error(
