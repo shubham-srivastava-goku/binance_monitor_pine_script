@@ -26,6 +26,9 @@ const DEFAULT_RSI_CONFIG = {
 const SYMBOL_RSI_CONFIGS = {
   trxusdt: { entry: 65, exit: 20 },
   bnbusdt: { entry: 65, exit: 20 },
+  solusdt: { entry: 65, exit: 20 },
+  ethusdt: { entry: 65, exit: 20 },
+  btcusdt: { entry: 65, exit: 20 },
   // Add other symbol-specific configs as needed
 };
 
@@ -476,6 +479,7 @@ const defaultBot = [
   "avaxusdt",
   "linkusdt",
   "trxusdt",
+  "btcusdt",
 ];
 
 // Start server
